@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/pred695/golang-blockchain/Blockchain"
 	"github.com/pred695/golang-blockchain/cli"
 	"rsc.io/quote"
 )
 
 func main() {
 	fmt.Println(quote.Go())
-	chain := Blockchain.InitBlockChain()
-	defer chain.Database.Close()
-	Cli := cli.CommandLine{C_blockchain: chain}
+	defer os.Exit(0)
+	Cli := cli.CommandLine{}
 	Cli.Run()
 }
