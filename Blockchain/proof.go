@@ -18,8 +18,8 @@ Step 4: Take the difficulty from the block
 Step 5: Join the data, previous hash, nonce and difficulty into a single byte slice
 Step 6: Hash the byte slice
 Step 7: Return the hash
-
 */
+
 const Difficulty = 18
 const MaxNonce = math.MaxInt64
 
@@ -47,7 +47,7 @@ func ToHex(num int64) []byte {
 func (proof *ProofOfWork) InitData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
-			proof.Block.Data,
+			proof.Block.HashTransactions(),
 			proof.Block.PrevHash,
 			ToHex(int64(nonce)),
 			ToHex(int64(Difficulty)),
