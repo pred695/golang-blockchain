@@ -9,17 +9,6 @@ import (
 	"log"
 )
 
-type TxOutput struct {
-	Value  int
-	PubKey string
-}
-
-type TxInput struct {
-	ID        []byte //references to the previous output that led to the input
-	OutputIdx int    //index of the referenced output which is spent in the transaction
-	Sign      string //signature or the sender's public key
-}
-
 // Outpoint is the index of the output in the transaction + the transaction id
 type Transaction struct {
 	ID      []byte
@@ -82,12 +71,4 @@ func (chain *Blockchain) NewTransaction(senders_add string, rec_address string, 
 
 func (tx *Transaction) Is_Coinbase() bool {
 	return len(tx.Inputs) == 1 && len(tx.Inputs[0].ID) == 0 && tx.Inputs[0].OutputIdx == -1
-}
-
-func (inputTx *TxInput) CanUnlock(data string) bool {
-	return inputTx.Sign == data
-}
-
-func (outputTx *TxOutput) CorrectRecAddress(data string) bool {
-	return outputTx.PubKey == data
 }
