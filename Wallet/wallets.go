@@ -9,15 +9,19 @@ import (
 	"os"
 )
 
-const walletFile = "temp/wallets.data"
+const walletFile = "./temp/wallets.data"
 
 type Wallets struct {
 	Wallets map[string]*Wallet
 }
 
+// Other custom types used within Wallet struct should also be registered
+
 func CreateWallets() (*Wallets, error) {
 	var ws Wallets = Wallets{make(map[string]*Wallet)}
 	var err error = ws.LoadFile()
+	gob.Register(Wallet{})        // Register Wallet struct
+	gob.Register(elliptic.P256()) // Register elliptic curve
 	return &ws, err
 }
 
@@ -55,7 +59,6 @@ func (ws *Wallets) LoadFile() error {
 		return err
 	}
 
-	gob.Register(elliptic.P256())
 	decoder := gob.NewDecoder(bytes.NewReader(fileContent))
 	err = decoder.Decode(&wallets)
 	if err != nil {
@@ -69,8 +72,6 @@ func (ws *Wallets) LoadFile() error {
 
 func (ws *Wallets) SaveFile() {
 	var content bytes.Buffer
-
-	gob.Register(elliptic.P256())
 
 	encoder := gob.NewEncoder(&content)
 	err := encoder.Encode(ws)

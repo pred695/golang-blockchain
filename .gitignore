@@ -2,3 +2,4 @@ vendor/*
 go.sum
 temp/blocks/*
 .vscode/*
+points.txt

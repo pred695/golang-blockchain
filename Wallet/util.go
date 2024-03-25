@@ -2,7 +2,6 @@ package Wallet
 
 import (
 	"github.com/mr-tron/base58"
-	"github.com/pred695/golang-blockchain/Blockchain"
 )
 
 // Base58 uses 6 less characters than base64, and is more human readable. the characters removed are 0, O, I, l, +, /
@@ -14,6 +13,6 @@ func Base58Encode(input []byte) []byte {
 
 func Base58Decode(input []byte) []byte {
 	decoded, err := base58.Decode(string(input[:])) //input[:] references the original byte slice
-	Blockchain.Handle(err)
+	Handle(err)
 	return decoded
 }
