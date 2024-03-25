@@ -1,6 +1,7 @@
 package Wallet
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -13,7 +14,7 @@ import (
 
 const (
 	version        = byte(0x00)
-	checksumLength = 4 //in bytes.
+	ChecksumLength = 4 //in bytes.
 )
 
 type Wallet struct {
@@ -39,9 +40,19 @@ func (w Wallet) CreateAddress() []byte {
 	// fmt.Printf("Private Key: %x\n", w.PrivateKey)
 	// fmt.Printf("Public Key: %x\n", w.PublicKey)
 	// fmt.Printf("Public Key Hash: %x\n", pubHash)
+
 	fmt.Printf("Address: %s\n", address)
 
 	return address
+}
+
+func ValidateAddress(address string) bool{
+	var pubKeyHash []byte = Base58Decode([]byte(address))
+	var actualChecksum []byte = pubKeyHash[(len(pubKeyHash) - ChecksumLength):]	//taking the last ChecksumLength bytes
+	var version byte = pubKeyHash[0]
+	pubKeyHash = pubKeyHash[1:(len(pubKeyHash) - ChecksumLength)]	//taking the bytes between version and checksum
+	var targetChecksum []byte = Checksum(append([]byte{version}, pubKeyHash...))
+	return bytes.Compare(actualChecksum, targetChecksum) == 0
 }
 
 // This function creates our private and public key
@@ -75,7 +86,7 @@ func CreatePubKeyHash(PubKey []byte) []byte {
 func Checksum(payload []byte) []byte {
 	var firstHash [32]byte = sha256.Sum256(payload)
 	var secondHash [32]byte = sha256.Sum256(firstHash[:])
-	return secondHash[:checksumLength] //first 4 bytes of the second hash
+	return secondHash[:ChecksumLength] //first 4 bytes of the second hash
 
 }
 
