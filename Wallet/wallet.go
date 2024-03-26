@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log"
+	"math/big"
 
 	"golang.org/x/crypto/ripemd160"
 )
@@ -18,8 +19,14 @@ const (
 )
 
 type Wallet struct {
-	PrivateKey ecdsa.PrivateKey
+	PrivateKey PrivateKey
 	PublicKey  []byte
+}
+
+type PrivateKey struct {
+	D *big.Int
+	X *big.Int
+	Y *big.Int
 }
 
 /*
@@ -46,28 +53,27 @@ func (w Wallet) CreateAddress() []byte {
 	return address
 }
 
-func ValidateAddress(address string) bool{
+func ValidateAddress(address string) bool {
 	var pubKeyHash []byte = Base58Decode([]byte(address))
-	var actualChecksum []byte = pubKeyHash[(len(pubKeyHash) - ChecksumLength):]	//taking the last ChecksumLength bytes
+	var actualChecksum []byte = pubKeyHash[(len(pubKeyHash) - ChecksumLength):] //taking the last ChecksumLength bytes
 	var version byte = pubKeyHash[0]
-	pubKeyHash = pubKeyHash[1:(len(pubKeyHash) - ChecksumLength)]	//taking the bytes between version and checksum
+	pubKeyHash = pubKeyHash[1:(len(pubKeyHash) - ChecksumLength)] //taking the bytes between version and checksum
 	var targetChecksum []byte = Checksum(append([]byte{version}, pubKeyHash...))
 	return bytes.Compare(actualChecksum, targetChecksum) == 0
 }
 
 // This function creates our private and public key
-func NewKeyPair() (ecdsa.PrivateKey, []byte) {
+func NewKeyPair() (PrivateKey, []byte) {
 	var curve elliptic.Curve = elliptic.P256() //(Outputs on this elliptic curve can range from 0 to 2 ^ 256{256 bytes})
-	var PrivateKey *ecdsa.PrivateKey
+	var Priv *ecdsa.PrivateKey
 	var err error
-	PrivateKey, err = ecdsa.GenerateKey(curve, rand.Reader)
+	Priv, err = ecdsa.GenerateKey(curve, rand.Reader)
 	Handle(err)
-	var PublicKey []byte = append(PrivateKey.PublicKey.X.Bytes(), PrivateKey.PublicKey.Y.Bytes()...)
-	return *PrivateKey, PublicKey
+	var PublicKey []byte = append(Priv.PublicKey.X.Bytes(), Priv.PublicKey.Y.Bytes()...)
+	return PrivateKey{D: Priv.D, X: Priv.PublicKey.X, Y: Priv.PublicKey.Y}, PublicKey
 }
-
 func MakeWallet() *Wallet {
-	var PrivateKey ecdsa.PrivateKey
+	var PrivateKey PrivateKey
 	var PublicKey []byte
 	PrivateKey, PublicKey = NewKeyPair()
 	var wallet Wallet = Wallet{PrivateKey, PublicKey}
@@ -88,6 +94,10 @@ func Checksum(payload []byte) []byte {
 	var secondHash [32]byte = sha256.Sum256(firstHash[:])
 	return secondHash[:ChecksumLength] //first 4 bytes of the second hash
 
+}
+
+func (priv PrivateKey) ToECDSA() ecdsa.PrivateKey {
+	return ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: elliptic.P256(), X: priv.X, Y: priv.Y}, D: priv.D}
 }
 
 func Handle(err error) {

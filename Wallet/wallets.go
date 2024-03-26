@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/elliptic"
 	"encoding/gob"
-	"fmt"
 	"log"
 	"os"
 )
@@ -15,36 +14,36 @@ type Wallets struct {
 	Wallets map[string]*Wallet
 }
 
-// Other custom types used within Wallet struct should also be registered
-
 func CreateWallets() (*Wallets, error) {
-	var ws Wallets = Wallets{make(map[string]*Wallet)}
-	var err error = ws.LoadFile()
-	gob.Register(Wallet{})        // Register Wallet struct
-	gob.Register(elliptic.P256()) // Register elliptic curve
-	return &ws, err
+	wallets := Wallets{}
+	wallets.Wallets = make(map[string]*Wallet)
+
+	err := wallets.LoadFile()
+
+	return &wallets, err
 }
 
-func (wallets *Wallets) GetWallet(address string) Wallet {
-	return *wallets.Wallets[address]
-}
+func (ws *Wallets) AddWallet() string {
+	wallet := MakeWallet()
+	address := string(wallet.CreateAddress())
 
-func (wallets *Wallets) AddWallet() string {
-	var wallet *Wallet = MakeWallet()
-	var byte_address = wallet.CreateAddress()
-	var address string = fmt.Sprintf("%s", byte_address)
+	ws.Wallets[address] = wallet
 
-	wallets.Wallets[address] = wallet
 	return address
 }
 
-func (wallets *Wallets) GetAllAddresses() []string {
+func (ws *Wallets) GetAllAddresses() []string {
 	var addresses []string
 
-	for address := range wallets.Wallets {
+	for address := range ws.Wallets {
 		addresses = append(addresses, address)
 	}
+
 	return addresses
+}
+
+func (ws Wallets) GetWallet(address string) Wallet {
+	return *ws.Wallets[address]
 }
 
 func (ws *Wallets) LoadFile() error {
@@ -53,12 +52,12 @@ func (ws *Wallets) LoadFile() error {
 	}
 
 	var wallets Wallets
-
 	fileContent, err := os.ReadFile(walletFile)
 	if err != nil {
 		return err
 	}
 
+	gob.Register(elliptic.P256())
 	decoder := gob.NewDecoder(bytes.NewReader(fileContent))
 	err = decoder.Decode(&wallets)
 	if err != nil {
@@ -72,6 +71,8 @@ func (ws *Wallets) LoadFile() error {
 
 func (ws *Wallets) SaveFile() {
 	var content bytes.Buffer
+
+	gob.Register(elliptic.P256())
 
 	encoder := gob.NewEncoder(&content)
 	err := encoder.Encode(ws)

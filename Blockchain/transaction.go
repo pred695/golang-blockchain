@@ -48,7 +48,6 @@ func CoinbaseTx(rec_address string, data string) *Transaction {
 	return &tx
 }
 
-
 func (tx *Transaction) Serialize() []byte {
 	var encoded bytes.Buffer
 
@@ -89,7 +88,7 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	return txCopy
 }
 
-func(chain *Blockchain) NewTransaction(send_address string, rec_address string, amount int) *Transaction {
+func (chain *Blockchain) NewTransaction(send_address string, rec_address string, amount int) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -113,15 +112,15 @@ func(chain *Blockchain) NewTransaction(send_address string, rec_address string, 
 		}
 	}
 
-	outputs = append(outputs, *NewTxOutput(amount, rec_address))	//creating the output for the receiver
+	outputs = append(outputs, *NewTxOutput(amount, rec_address)) //creating the output for the receiver
 
 	if acc > amount {
-		outputs = append(outputs, *NewTxOutput(acc-amount, send_address))	//sending the remaining amount back to the sender
+		outputs = append(outputs, *NewTxOutput(acc-amount, send_address)) //sending the remaining amount back to the sender
 	}
 
-	var tx Transaction = Transaction{ID: nil, Inputs: inputs, Outputs:  outputs}
+	var tx Transaction = Transaction{ID: nil, Inputs: inputs, Outputs: outputs}
 	tx.ID = tx.HashTransaction()
-	chain.SignTransaction(&tx, w.PrivateKey)
+	chain.SignTransaction(&tx, w.PrivateKey.ToECDSA())
 
 	return &tx
 }
@@ -181,13 +180,16 @@ func (tx *Transaction) Sign(private_key ecdsa.PrivateKey, prevTXs map[string]Tra
 		txCopy.Inputs[inID].PubKey = prevTx.Outputs[input.OutputIdx].PubKeyHash
 		txCopy.ID = txCopy.HashTransaction()
 		txCopy.Inputs[inID].PubKey = nil //clearing it again so it doesn't affect the next iteration and signing
-
 		r, s, err := ecdsa.Sign(rand.Reader, &private_key, txCopy.ID)
 		Handle(err)
 		var signature []byte = append(r.Bytes(), s.Bytes()...)
 		tx.Inputs[inID].Signature = signature
 	}
 
+}
+
+func (priv PrivateKey) ToECDSA() ecdsa.PrivateKey {
+	return ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: elliptic.P256(), X: priv.X, Y: priv.Y}, D: priv.D}
 }
 
 func (tx *Transaction) To_String() string {

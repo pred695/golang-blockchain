@@ -33,7 +33,7 @@ func (inputTx *TxInput) UsesKey(pubKeyHash []byte) bool {
 
 func (outputTx *TxOutput) Lock(address []byte) {
 	var pubKeyHash []byte = Wallet.Base58Decode(address)
-	pubKeyHash = pubKeyHash[1:len(pubKeyHash) - Wallet.ChecksumLength]	//taking the bytes between version and checksum
+	pubKeyHash = pubKeyHash[1:len(pubKeyHash) - 4]	//taking the bytes between version and checksum
 	outputTx.PubKeyHash = pubKeyHash	//the output is locked with the public key hash, to be unlocked by the input's  public key
 }
 
