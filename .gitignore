@@ -1,5 +1,6 @@
 vendor/*
 go.sum
+temp/wallets.data
 temp/blocks/*
 .vscode/*
 points.txt

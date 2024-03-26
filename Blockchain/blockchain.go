@@ -107,7 +107,7 @@ func ContinueBlockchain(address string) *Blockchain {
 	return &blockchain
 }
 
-func (chain *Blockchain) AddBlock(transactions []*Transaction) {
+func (chain *Blockchain) AddBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 	//View function allows to read transactions from the database.
 	err := chain.Database.View(func(txn *badger.Txn) error {
@@ -128,6 +128,7 @@ func (chain *Blockchain) AddBlock(transactions []*Transaction) {
 		return err
 	})
 	Handle(err)
+	return newBlock
 }
 
 // Iterating from the newest to the genesis block(reverse iteration)
@@ -150,83 +151,44 @@ func (iter *BlockchainIterator) Next() *Block {
 	return block
 }
 
-func (chain *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
-	var unspentTransactions []Transaction
-	spentTXOs := make(map[string][]int) //map of string(key) and slice of int(value)
 
-	iter := chain.Iterator()
+func (chain *Blockchain) FindUTXO() map[string]TxOutputs {
+	var UTXO map[string]TxOutputs = make(map[string]TxOutputs)
+	var spentTXOs map[string][]int = make(map[string][]int)
+	var iter *BlockchainIterator = chain.Iterator()
+	for{
+		var block *Block = iter.Next()
 
-	for {
-		block := iter.Next()
-
-		for _, tx := range block.Transactions {
-			txID := hex.EncodeToString(tx.ID)
+		for _, tx := range block.Transactions{
+			var txID string = hex.EncodeToString(tx.ID)
 
 		Outputs:
-			for outIdx, output := range tx.Outputs {
-				if spentTXOs[txID] != nil {
-					for _, spentOut := range spentTXOs[txID] {
-						if spentOut == outIdx {
-							continue Outputs //if the output is already spent, continue to the next output
+			for outIdx, output := range tx.Outputs{
+				if spentTXOs[txID] != nil{
+					for _, spentOutput := range spentTXOs[txID]{
+						if spentOutput == outIdx{
+							continue Outputs
 						}
 					}
 				}
-				if output.IsLockedWithKey(pubKeyHash) { //output's public key is the same as the address
-					unspentTransactions = append(unspentTransactions, *tx)
-				}
+				var outputs TxOutputs = UTXO[txID]
+				outputs.Outputs = append(outputs.Outputs, output)
+				UTXO[txID] = outputs
 			}
-			if tx.Is_Coinbase() == false { //skipping coinbase transactions as it has no inputs.
-				for _, input := range tx.Inputs { //finding other outputs which are referenced using inputs.
-					if input.UsesKey(pubKeyHash) {
-						inTxID := hex.EncodeToString(input.ID)
-						spentTXOs[inTxID] = append(spentTXOs[inTxID], input.OutputIdx)
-					}
-				}
-			}
-		}
-		if len(block.PrevHash) == 0 {
-			break //reached the genesis block
-		}
-	}
-	return unspentTransactions
-}
-
-func (chain *Blockchain) FindUTXO(pubKeyHash []byte) []TxOutput {
-	var UTXOs []TxOutput
-	var unspentTx []Transaction = chain.FindUnspentTransactions(pubKeyHash)
-	for _, tx := range unspentTx {
-		for _, output := range tx.Outputs {
-			if output.IsLockedWithKey(pubKeyHash) {
-				UTXOs = append(UTXOs, output)
-			}
-		}
-	}
-	return UTXOs
-}
-
-func (chain *Blockchain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int, map[string][]int) {
-	var unspentOutputs map[string][]int
-	unspentOutputs = make(map[string][]int)
-	var unspentTxs = chain.FindUnspentTransactions(pubKeyHash)
-	var accumulated int = 0
-	//spendable outputs are always the outputs of the unspent transactions
-Work:
-	for _, tx := range unspentTxs {
-		txID := hex.EncodeToString(tx.ID)
-
-		for outIdx, output := range tx.Outputs {
-			if output.IsLockedWithKey(pubKeyHash) && accumulated < amount {
-				accumulated += output.Value
-				unspentOutputs[txID] = append(unspentOutputs[txID], outIdx)
-
-				if accumulated >= amount {
-					break Work
+			if tx.Is_Coinbase() == false{
+				for _, input := range tx.Inputs{
+					var inTxID string = hex.EncodeToString(input.ID)
+					spentTXOs[inTxID] = append(spentTXOs[inTxID], input.OutputIdx)
 				}
 			}
 		}
+		if len(block.PrevHash) == 0{
+			break	//reached the genesis block
+		}
 	}
-	return accumulated, unspentOutputs
+	return UTXO
 }
+
 
 func (chain *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 	var iter *BlockchainIterator = chain.Iterator()

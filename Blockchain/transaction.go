@@ -28,7 +28,7 @@ func (tx *Transaction) SetID() {
 	//encode the transaction
 	var hash [32]byte
 
-	encoder := gob.NewEncoder(&encoded) //the encoder writes to the buffer and stores in the "encoded variable"
+	var encoder *gob.Encoder = gob.NewEncoder(&encoded) //the encoder writes to the buffer and stores in the "encoded variable"
 	err := encoder.Encode(tx)           //encodes the transaction into a byte slice
 	Handle(err)
 	hash = sha256.Sum256(encoded.Bytes())
@@ -41,8 +41,8 @@ func CoinbaseTx(rec_address string, data string) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Coins to %s", rec_address)
 	}
-	txin := TxInput{ID: []byte{}, OutputIdx: -1, Signature: nil, PubKey: []byte(data)}
-	txout := NewTxOutput(100, rec_address)
+	var txin TxInput = TxInput{ID: []byte{}, OutputIdx: -1, Signature: nil, PubKey: []byte(data)}
+	var txout *TxOutput = NewTxOutput(100, rec_address)
 	tx := Transaction{ID: nil, Inputs: []TxInput{txin}, Outputs: []TxOutput{*txout}}
 	tx.SetID() //creates the hash id for the transaction
 	return &tx
@@ -88,7 +88,7 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	return txCopy
 }
 
-func (chain *Blockchain) NewTransaction(send_address string, rec_address string, amount int) *Transaction {
+func (UTXO *UTXOSet) NewTransaction(send_address string, rec_address string, amount int) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -96,7 +96,7 @@ func (chain *Blockchain) NewTransaction(send_address string, rec_address string,
 	Handle(err)
 	w := wallets.GetWallet(send_address)
 	var pubKeyHash []byte = Wallet.CreatePubKeyHash(w.PublicKey)
-	acc, validOutputs := chain.FindSpendableOutputs(pubKeyHash, amount)
+	acc, validOutputs := UTXO.FindSpendableOutputs(pubKeyHash, amount)
 
 	if acc < amount {
 		log.Panic("Error: not enough funds")
@@ -120,7 +120,7 @@ func (chain *Blockchain) NewTransaction(send_address string, rec_address string,
 
 	var tx Transaction = Transaction{ID: nil, Inputs: inputs, Outputs: outputs}
 	tx.ID = tx.HashTransaction()
-	chain.SignTransaction(&tx, w.PrivateKey.ToECDSA())
+	UTXO.Blockchain.SignTransaction(&tx, w.PrivateKey.ToECDSA())
 
 	return &tx
 }
