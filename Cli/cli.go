@@ -35,7 +35,6 @@ func (cli *CommandLine) ListAddresses() {
 	wallets, err := Wallet.CreateWallets() //loads the wallets from the file
 	Blockchain.Handle(err)
 	addresses := wallets.GetAllAddresses()
-	Blockchain.Handle(err)
 	fmt.Println(len(addresses))
 	for _, address := range addresses {
 		fmt.Println(address)
@@ -45,7 +44,10 @@ func (cli *CommandLine) ListAddresses() {
 func (cli *CommandLine) CreateWallet() {
 	wallets, _ := Wallet.CreateWallets() //loads the wallets from the file
 	address := wallets.AddWallet() 	 //adds a new wallet
+	wallets.SaveFile()
+
 	fmt.Printf("New address: %s\n", address)
+
 }
 
 func (cli *CommandLine) PrintChain() {
@@ -55,6 +57,7 @@ func (cli *CommandLine) PrintChain() {
 
 	for {
 		block := iter.Next()
+
 		fmt.Printf("Prev. hash: %x\n", block.PrevHash)
 		fmt.Printf("Hash: %x\n", block.Hash)
 		pow := Blockchain.NewProof(block)

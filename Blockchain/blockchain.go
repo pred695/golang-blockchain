@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"runtime"
 
@@ -22,6 +23,12 @@ const (
 type Blockchain struct {
 	LastHash []byte     //The hash of the previous block
 	Database *badger.DB //pointer to the database.
+}
+
+type PrivateKey struct {
+	D *big.Int
+	X *big.Int
+	Y *big.Int
 }
 
 // to iterate over the blockchain
