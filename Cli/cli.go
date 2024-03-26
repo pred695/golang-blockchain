@@ -22,6 +22,7 @@ func (cli *CommandLine) printUsage() {
 	fmt.Println(" send -from FROM -to TO -amount AMOUNT - Send amount of coins")
 	fmt.Println(" createwallet - Creates a new wallet")
 	fmt.Println(" listaddresses - Lists the addresses in our wallet file")
+	fmt.Println(" reindexutxo - Rebuilds the UTXO set")
 }
 
 func (cli *CommandLine) ValidateArgs() {
@@ -31,23 +32,39 @@ func (cli *CommandLine) ValidateArgs() {
 	}
 }
 
-func (cli *CommandLine) ListAddresses() {
-	wallets, err := Wallet.CreateWallets() //loads the wallets from the file
-	Blockchain.Handle(err)
-	addresses := wallets.GetAllAddresses()
-	fmt.Println(len(addresses))
-	for _, address := range addresses {
-		fmt.Println(address)
+func (cli *CommandLine) GetBalance(address string) {
+
+	if(!Wallet.ValidateAddress(address)){
+		log.Panic("Address is not valid")
 	}
+
+	var chain *Blockchain.Blockchain = Blockchain.ContinueBlockchain(address)
+	var UTXOSet Blockchain.UTXOSet = Blockchain.UTXOSet{Blockchain: chain}
+	defer chain.Database.Close()
+
+	var balance int = 0
+	var pubKeyHash []byte = Wallet.Base58Decode([]byte(address))
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
+	var UTXOs []Blockchain.TxOutput = UTXOSet.FindUnspentTransactions(pubKeyHash)
+
+	for _, out := range UTXOs {
+		balance += out.Value
+	}
+
+	fmt.Printf("Balance of %s: %d\n", address, balance)
 }
 
-func (cli *CommandLine) CreateWallet() {
-	wallets, _ := Wallet.CreateWallets() //loads the wallets from the file
-	address := wallets.AddWallet() 	 //adds a new wallet
-	wallets.SaveFile()
+func (cli *CommandLine) CreateBlockChain(address string) {
 
-	fmt.Printf("New address: %s\n", address)
+	if(!Wallet.ValidateAddress(address)){
+		log.Panic("Address is not valid")
+	}
 
+	chain := Blockchain.InitBlockChain(address)
+	defer chain.Database.Close()
+	var UTXOSet Blockchain.UTXOSet = Blockchain.UTXOSet{Blockchain: chain}
+	UTXOSet.Reindex()
+	fmt.Println("Finished!")
 }
 
 func (cli *CommandLine) PrintChain() {
@@ -72,38 +89,6 @@ func (cli *CommandLine) PrintChain() {
 	}
 }
 
-func (cli *CommandLine) CreateBlockChain(address string) {
-
-	if(!Wallet.ValidateAddress(address)){
-		log.Panic("Address is not valid")
-	}
-
-	chain := Blockchain.InitBlockChain(address)
-	chain.Database.Close()
-	fmt.Println("Finished!")
-}
-
-func (cli *CommandLine) GetBalance(address string) {
-
-	if(!Wallet.ValidateAddress(address)){
-		log.Panic("Address is not valid")
-	}
-
-	var chain *Blockchain.Blockchain = Blockchain.ContinueBlockchain(address)
-	defer chain.Database.Close()
-
-	var balance int = 0
-	var pubKeyHash []byte = Wallet.Base58Decode([]byte(address))
-	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
-	var UTXOs []Blockchain.TxOutput = chain.FindUTXO(pubKeyHash)
-
-	for _, out := range UTXOs {
-		balance += out.Value
-	}
-
-	fmt.Printf("Balance of %s: %d\n", address, balance)
-}
-
 func (cli *CommandLine) Send(from, to string, amount int) {
 
 	if(!Wallet.ValidateAddress(from)){
@@ -114,11 +99,43 @@ func (cli *CommandLine) Send(from, to string, amount int) {
 	}
 
 	chain := Blockchain.ContinueBlockchain(from)
+	var UTXO Blockchain.UTXOSet = Blockchain.UTXOSet{Blockchain: chain}
 	defer chain.Database.Close()
 
-	tx := chain.NewTransaction(from, to, amount)
-	chain.AddBlock([]*Blockchain.Transaction{tx})
+	tx := UTXO.NewTransaction(from, to, amount)
+	var block *Blockchain.Block = chain.AddBlock([]*Blockchain.Transaction{tx})
+	UTXO.Update(block)
 	fmt.Println("Success!")
+}
+
+func (cli *CommandLine) CreateWallet() {
+	wallets, _ := Wallet.CreateWallets() //loads the wallets from the file
+	address := wallets.AddWallet() 	 //adds a new wallet
+	wallets.SaveFile()
+
+	fmt.Printf("New address: %s\n", address)
+
+}
+
+func (cli *CommandLine) ListAddresses() {
+	wallets, err := Wallet.CreateWallets() //loads the wallets from the file
+	Blockchain.Handle(err)
+	addresses := wallets.GetAllAddresses()
+	fmt.Println(len(addresses))
+	for _, address := range addresses {
+		fmt.Println(address)
+	}
+}
+
+func (cli *CommandLine) ReindexUTXO() {
+	var chain *Blockchain.Blockchain = Blockchain.ContinueBlockchain("")
+	defer chain.Database.Close()
+	var UTXOSet Blockchain.UTXOSet = Blockchain.UTXOSet{Blockchain: chain}
+
+	UTXOSet.Reindex()
+
+	count := UTXOSet.CountTransactions()
+	fmt.Printf("Done! There are %d transactions in the UTXO set.\n", count)
 }
 
 func (cli *CommandLine) Run() {
@@ -130,6 +147,7 @@ func (cli *CommandLine) Run() {
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
 	listAddressesCmd := flag.NewFlagSet("listaddresses", flag.ExitOnError)
+	reindexUTXOCmd := flag.NewFlagSet("reindexutxo", flag.ExitOnError)
 
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
 	createBlockchainAddress := createBlockchainCmd.String("address", "", "The address to send genesis block reward to")
@@ -140,35 +158,25 @@ func (cli *CommandLine) Run() {
 	switch os.Args[1] {
 	case "getbalance":
 		err := getBalanceCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
+		Handle(err)
 	case "createblockchain":
 		err := createBlockchainCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
+		Handle(err)
 	case "printchain":
 		err := printChainCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
+		Handle(err)
 	case "send":
 		err := sendCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
+		Handle(err)
 	case "createwallet":
 		err := createWalletCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
+		Handle(err)
 	case "listaddresses":
 		err := listAddressesCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
-	
+		Handle(err)
+	case "reindexutxo":
+		err := reindexUTXOCmd.Parse(os.Args[2:])
+		Blockchain.Handle(err)	
 	default:
 		cli.printUsage()
 		runtime.Goexit()
@@ -207,5 +215,14 @@ func (cli *CommandLine) Run() {
 	}
 	if listAddressesCmd.Parsed() {
 		cli.ListAddresses()
+	}
+	if reindexUTXOCmd.Parsed() {
+		cli.ReindexUTXO()
+	}
+}
+
+func Handle(err error) {
+	if err != nil {
+		log.Panic(err)
 	}
 }
