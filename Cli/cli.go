@@ -100,10 +100,12 @@ func (cli *CommandLine) Send(from, to string, amount int) {
 
 	chain := Blockchain.ContinueBlockchain(from)
 	var UTXO Blockchain.UTXOSet = Blockchain.UTXOSet{Blockchain: chain}
+	//Since the user who is sending the coins is the one who is creating the transaction(block as of now), we need to consider this transaction as a coinbase transaction
+	var cbTx Blockchain.Transaction = *Blockchain.CoinbaseTx(from, "")
 	defer chain.Database.Close()
 
 	tx := UTXO.NewTransaction(from, to, amount)
-	var block *Blockchain.Block = chain.AddBlock([]*Blockchain.Transaction{tx})
+	var block *Blockchain.Block = chain.AddBlock([]*Blockchain.Transaction{&cbTx, tx})
 	UTXO.Update(block)
 	fmt.Println("Success!")
 }

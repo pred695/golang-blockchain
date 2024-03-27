@@ -23,28 +23,20 @@ type Transaction struct {
 	Outputs []TxOutput
 }
 
-func (tx *Transaction) SetID() {
-	var encoded bytes.Buffer //more efficient than using strings/[]byte
-	//encode the transaction
-	var hash [32]byte
-
-	var encoder *gob.Encoder = gob.NewEncoder(&encoded) //the encoder writes to the buffer and stores in the "encoded variable"
-	err := encoder.Encode(tx)           //encodes the transaction into a byte slice
-	Handle(err)
-	hash = sha256.Sum256(encoded.Bytes())
-	tx.ID = hash[:]
-}
 
 // Coinbase Transaction --> A transaction that creates a new coin, it is the first transaction in a block(rewarding transaction).
 // it has no inputs(no reference to previous outputs and no outpoint) and only one output.
 func CoinbaseTx(rec_address string, data string) *Transaction {
 	if data == "" {
-		data = fmt.Sprintf("Coins to %s", rec_address)
+		var randData []byte = make([]byte, 24)
+		_, err := rand.Read(randData)
+		Handle(err)
+		data = fmt.Sprintf("%x", randData)
 	}
 	var txin TxInput = TxInput{ID: []byte{}, OutputIdx: -1, Signature: nil, PubKey: []byte(data)}
-	var txout *TxOutput = NewTxOutput(100, rec_address)
+	var txout *TxOutput = NewTxOutput(50, rec_address)
 	tx := Transaction{ID: nil, Inputs: []TxInput{txin}, Outputs: []TxOutput{*txout}}
-	tx.SetID() //creates the hash id for the transaction
+	tx.ID = tx.HashTransaction() //creates the hash id for the transaction
 	return &tx
 }
 
